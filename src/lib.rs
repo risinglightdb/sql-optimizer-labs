@@ -37,6 +37,33 @@ define_language! {
         "and" = And([Id; 2]),
         "or" = Or([Id; 2]),
         "xor" = Xor([Id; 2]),
+
+        // aggregations
+        "max" = Max(Id),
+        "min" = Min(Id),
+        "sum" = Sum(Id),
+        "avg" = Avg(Id),
+        "count" = Count(Id),
+
+        // plans
+        "scan" = Scan([Id; 2]),                 // (scan table [column..])
+        "values" = Values(Box<[Id]>),           // (values [expr..]..)
+        "proj" = Proj([Id; 2]),                 // (proj [expr..] child)
+        "filter" = Filter([Id; 2]),             // (filter expr child)
+        "order" = Order([Id; 2]),               // (order [order_key..] child)
+            "asc" = Asc(Id),                        // (asc key)
+            "desc" = Desc(Id),                      // (desc key)
+        "limit" = Limit([Id; 3]),               // (limit limit offset child)
+        "topn" = TopN([Id; 4]),                 // (topn limit offset [order_key..] child)
+        "join" = Join([Id; 4]),                 // (join join_type expr left right)
+        "hashjoin" = HashJoin([Id; 5]),         // (hashjoin join_type [left_expr..] [right_expr..] left right)
+            "inner" = Inner,
+            "left_outer" = LeftOuter,
+            "right_outer" = RightOuter,
+            "full_outer" = FullOuter,
+        "agg" = Agg([Id; 3]),                   // (agg aggs=[expr..] group_keys=[expr..] child)
+                                                    // expressions must be agg
+                                                    // output = aggs || group_keys
     }
 }
 

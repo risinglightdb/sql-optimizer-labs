@@ -123,6 +123,8 @@ pub fn eval_constant(egraph: &EGraph, enode: &Expr) -> ConstValue {
         And([a, b]) => x(a)?.and(x(b)?),
         Or([a, b]) => x(a)?.or(x(b)?),
         Xor([a, b]) => x(a)?.xor(x(b)?),
+        Max(a) | Min(a) | Avg(a) => x(a)?.clone(),
+        _ => return None,
     })
 }
 
