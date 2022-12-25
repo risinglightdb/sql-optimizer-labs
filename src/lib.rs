@@ -2,6 +2,7 @@ use std::hash::Hash;
 
 use egg::{define_language, Analysis, DidMerge, Id, Var};
 
+pub mod agg;
 pub mod expr;
 pub mod plan;
 mod value;
@@ -16,9 +17,9 @@ define_language! {
     pub enum Expr {
         // values
         Constant(Value),            // null, true, 1, 'hello'
-        Column(Column),             // t.a, b, c
 
         // utilities
+        "`" = Nested(Id),           // (` expr) a wrapper over expr to prevent optimization
         "list" = List(Box<[Id]>),   // (list ...)
 
         // unary operations
@@ -75,6 +76,8 @@ define_language! {
         "empty" = Empty(Id),                    // (empty child)
                                                     // returns empty chunk
                                                     // with the same schema as `child`
+
+        Column(Column),             // t.a, b, c
     }
 }
 
@@ -101,6 +104,9 @@ pub struct Data {
 
     /// All columns involved in the node.
     pub columns: plan::ColumnSet,
+
+    /// All aggragations in the tree.
+    pub aggs: agg::AggSet,
 }
 
 impl Analysis<Expr> for ExprAnalysis {
@@ -111,6 +117,7 @@ impl Analysis<Expr> for ExprAnalysis {
         Data {
             constant: expr::eval_constant(egraph, enode),
             columns: plan::analyze_columns(egraph, enode),
+            aggs: agg::analyze_aggs(egraph, enode),
         }
     }
 
@@ -125,7 +132,8 @@ impl Analysis<Expr> for ExprAnalysis {
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let merge_const = egg::merge_max(&mut to.constant, from.constant);
         let merge_columns = plan::merge(&mut to.columns, from.columns);
-        merge_const | merge_columns
+        let merge_aggs = egg::merge_max(&mut to.aggs, from.aggs);
+        merge_const | merge_columns | merge_aggs
     }
 
     /// Modify the graph after analyzing a node.
