@@ -1,4 +1,6 @@
-use egg::{define_language, Analysis, DidMerge, Id, Symbol};
+use std::hash::Hash;
+
+use egg::{define_language, Analysis, DidMerge, Id};
 
 pub mod expr;
 pub mod plan;
@@ -7,14 +9,14 @@ mod value;
 pub use value::*;
 
 pub type RecExpr = egg::RecExpr<Expr>;
-type EGraph = egg::EGraph<Expr, ExprAnalysis>;
-type Rewrite = egg::Rewrite<Expr, ExprAnalysis>;
+pub type EGraph = egg::EGraph<Expr, ExprAnalysis>;
+pub type Rewrite = egg::Rewrite<Expr, ExprAnalysis>;
 
 define_language! {
     pub enum Expr {
         // values
         Constant(Value),            // null, true, 1, 'hello'
-        Column(Symbol),             // t.a, b, c
+        Column(Column),             // t.a, b, c
 
         // utilities
         "list" = List(Box<[Id]>),   // (list ...)
@@ -84,6 +86,9 @@ pub struct ExprAnalysis;
 pub struct Data {
     /// Some if the expression is a constant.
     pub constant: expr::ConstValue,
+
+    /// All columns involved in the node.
+    pub columns: plan::ColumnSet,
 }
 
 impl Analysis<Expr> for ExprAnalysis {
@@ -93,6 +98,7 @@ impl Analysis<Expr> for ExprAnalysis {
     fn make(egraph: &EGraph, enode: &Expr) -> Self::Data {
         Data {
             constant: expr::eval_constant(egraph, enode),
+            columns: plan::analyze_columns(egraph, enode),
         }
     }
 
@@ -106,7 +112,8 @@ impl Analysis<Expr> for ExprAnalysis {
     /// new result `Some(1)` with the previous `None` and keep `Some(1)` as the final result.
     fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
         let merge_const = egg::merge_max(&mut to.constant, from.constant);
-        merge_const
+        let merge_columns = plan::merge(&mut to.columns, from.columns);
+        merge_const | merge_columns
     }
 
     /// Modify the graph after analyzing a node.

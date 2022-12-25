@@ -154,3 +154,5 @@ impl Not for Value {
         }
     }
 }
+
+pub type Column = egg::Symbol;
