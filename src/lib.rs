@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use egg::{define_language, Analysis, DidMerge, Id};
+use egg::{define_language, Analysis, DidMerge, Id, Var};
 
 pub mod expr;
 pub mod plan;
@@ -69,9 +69,21 @@ define_language! {
                                                     // output = aggs || group_keys
 
         // internal functions
+        "prune" = Prune([Id; 2]),               // (prune node child)
+                                                    // do column prune on `child`
+                                                    // with the used columns in `node`
         "empty" = Empty(Id),                    // (empty child)
                                                     // returns empty chunk
                                                     // with the same schema as `child`
+    }
+}
+
+impl Expr {
+    fn as_list(&self) -> &[Id] {
+        match self {
+            Expr::List(l) => l,
+            _ => panic!("expected list"),
+        }
     }
 }
 
@@ -120,4 +132,11 @@ impl Analysis<Expr> for ExprAnalysis {
     fn modify(egraph: &mut EGraph, id: Id) {
         expr::union_constant(egraph, id);
     }
+}
+
+/// Create a [`Var`] from string.
+///
+/// This is a helper function for submodules.
+fn var(s: &str) -> Var {
+    s.parse().expect("invalid variable")
 }

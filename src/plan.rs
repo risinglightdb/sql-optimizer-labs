@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::*;
-use egg::{rewrite as rw, Language, Pattern, Subst, Var};
+use egg::{rewrite as rw, Applier, Language, Pattern, PatternAst, Subst, Symbol, Var};
 
 /// Returns the rules that always improve the plan.
 pub fn rules() -> Vec<Rewrite> {
@@ -136,8 +136,8 @@ fn columns_is(
     var2: &str,
     f: impl Fn(&ColumnSet, &ColumnSet) -> bool,
 ) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
-    let var1 = var1.parse::<Var>().unwrap();
-    let var2 = var2.parse::<Var>().unwrap();
+    let var1 = var(var1);
+    let var2 = var(var2);
     move |egraph, _, subst| {
         let var1_set = &egraph[subst[var1]].data.columns;
         let var2_set = &egraph[subst[var2]].data.columns;
@@ -173,4 +173,104 @@ pub fn merge(to: &mut ColumnSet, from: ColumnSet) -> DidMerge {
     } else {
         DidMerge(false, true)
     }
+}
+
+/// Column pruning rules remove unused columns from a plan.
+/// 
+/// We introduce an internal node [`Expr::Prune`] 
+/// to top-down traverse the plan tree and collect all used columns.
+#[rustfmt::skip]
+pub fn column_pruning_rules() -> Vec<Rewrite> { vec![
+    // projection is the source of prune node
+    //   note that this rule may be applied for a lot of times,
+    //   so it's not recommand to apply column pruning with other rules together.
+    rw!("prune-gen";
+        "(proj ?exprs ?child)" =>
+        "(proj ?exprs (prune ?exprs ?child))"
+    ),
+    // then it is pushed down through the plan node tree,
+    // merging all used columns along the way
+    rw!("prune-limit";
+        "(prune ?set (limit ?limit ?offset ?child))" =>
+        "(limit ?limit ?offset (prune ?set ?child))"
+    ),
+    // note that we use `list` to represent the union of multiple column sets.
+    // because the column set of `list` is calculated by union all its children.
+    // see `analyze_columns()`.
+    rw!("prune-order";
+        "(prune ?set (order ?keys ?child))" =>
+        "(order ?keys (prune (list ?set ?keys) ?child))"
+    ),
+    rw!("prune-filter";
+        "(prune ?set (filter ?cond ?child))" =>
+        "(filter ?cond (prune (list ?set ?cond) ?child))"
+    ),
+    rw!("prune-agg";
+        "(prune ?set (agg ?aggs ?groupby ?child))" =>
+        "(agg ?aggs ?groupby (prune (list ?set ?aggs ?groupby) ?child))"
+    ),
+    rw!("prune-join";
+        "(prune ?set (join ?type ?on ?left ?right))" =>
+        "(join ?type ?on
+            (prune (list ?set ?on) ?left)
+            (prune (list ?set ?on) ?right)
+        )"
+    ),
+    // projection and scan is the sink of prune node
+    rw!("prune-proj";
+        "(prune ?set (proj ?exprs ?child))" =>
+        "(proj (prune ?set ?exprs) ?child))"
+    ),
+    rw!("prune-scan";
+        "(prune ?set (scan ?table ?columns))" =>
+        "(scan ?table (prune ?set ?columns))"
+    ),
+    // finally the prune is applied to a list of expressions
+    rw!("prune-list";
+        "(prune ?set ?list)" =>
+        { PruneList {
+            set: var("?set"),
+            list: var("?list"),
+        }}
+        if is_list("?list")
+    ),
+]}
+
+/// Remove unused columns in `set` from `list`.
+struct PruneList {
+    set: Var,
+    list: Var,
+}
+
+impl Applier<Expr, ExprAnalysis> for PruneList {
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph,
+        eclass: Id,
+        subst: &Subst,
+        _searcher_ast: Option<&PatternAst<Expr>>,
+        _rule_name: Symbol,
+    ) -> Vec<Id> {
+        let used_columns = &egraph[subst[self.set]].data.columns;
+        let list = egraph[subst[self.list]].nodes[0].as_list();
+        let pruned = (list.iter().cloned())
+            .filter(|id| !egraph[*id].data.columns.is_disjoint(used_columns))
+            .collect();
+        let id = egraph.add(Expr::List(pruned));
+
+        // copied from `Pattern::apply_one`
+        if egraph.union(eclass, id) {
+            vec![eclass]
+        } else {
+            vec![]
+        }
+    }
+}
+
+/// Returns true if the variable is a list.
+fn is_list(v: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    let v = var(v);
+    // we have no rule to rewrite a list,
+    // so it should only contains one `Expr::List` in `nodes`.
+    move |egraph, _, subst| matches!(egraph[subst[v]].nodes.first(), Some(Expr::List(_)))
 }
