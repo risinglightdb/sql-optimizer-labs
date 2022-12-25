@@ -1,10 +1,12 @@
 use egg::{define_language, Id, Symbol};
 
+pub mod expr;
 mod value;
 
 pub use value::*;
 
 pub type RecExpr = egg::RecExpr<Expr>;
+pub type Rewrite = egg::Rewrite<Expr, ()>;
 
 define_language! {
     pub enum Expr {
