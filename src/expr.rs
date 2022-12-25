@@ -84,3 +84,43 @@ pub fn rules() -> Vec<Rewrite> { vec![
     rw!("xor-not";   "(xor ?a (not ?a))"  => "true"),
     rw!("xor-assoc"; "(xor ?a (xor ?b ?c))" => "(xor (xor ?a ?b) ?c)"),
 ]}
+
+/// The data type of constant analysis.
+///
+/// `Some` for a known constant, `None` for unknown.
+pub type ConstValue = Option<Value>;
+
+/// Evaluate constant for a node.
+pub fn eval_constant(egraph: &EGraph, enode: &Expr) -> ConstValue {
+    use Expr::*;
+    let x = |i: &Id| egraph[*i].data.constant.as_ref();
+    Some(match enode {
+        Constant(v) => v.clone(),
+        Column(_) => return None,
+        List(_) => return None,
+        Neg(a) => -x(a)?.clone(),
+        Not(a) => !x(a)?.clone(),
+        IsNull(a) => x(a)?.is_null().into(),
+        Add([a, b]) => x(a)? + x(b)?,
+        Sub([a, b]) => x(a)? - x(b)?,
+        Mul([a, b]) => x(a)? * x(b)?,
+        Div([a, b]) => x(a)? / x(b)?,
+        Eq([a, b]) => (x(a)? == x(b)?).into(),
+        NotEq([a, b]) => (x(a)? != x(b)?).into(),
+        Gt([a, b]) => (x(a)? > x(b)?).into(),
+        Lt([a, b]) => (x(a)? < x(b)?).into(),
+        GtEq([a, b]) => (x(a)? >= x(b)?).into(),
+        LtEq([a, b]) => (x(a)? <= x(b)?).into(),
+        And([a, b]) => x(a)?.and(x(b)?),
+        Or([a, b]) => x(a)?.or(x(b)?),
+        Xor([a, b]) => x(a)?.xor(x(b)?),
+    })
+}
+
+/// Union `id` with a new constant node if it's constant.
+pub fn union_constant(egraph: &mut EGraph, id: Id) {
+    if let Some(val) = &egraph[id].data.constant {
+        let added = egraph.add(Expr::Constant(val.clone()));
+        egraph.union(id, added);
+    }
+}
