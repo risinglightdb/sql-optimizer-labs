@@ -1,4 +1,4 @@
-use egg_sql_labs::expr::rules;
+use sql_optimizer_labs::expr::rules;
 
 egg::test_fn! {
     #[should_panic]

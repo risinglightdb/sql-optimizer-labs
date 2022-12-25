@@ -1,4 +1,4 @@
-use egg_sql_labs::{Expr, RecExpr, Value};
+use sql_optimizer_labs::{Expr, RecExpr, Value};
 
 #[test]
 fn values() {

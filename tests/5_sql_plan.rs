@@ -1,4 +1,4 @@
-use egg_sql_labs::RecExpr;
+use sql_optimizer_labs::RecExpr;
 
 #[test]
 fn aggregations() {

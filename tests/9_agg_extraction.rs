@@ -1,5 +1,5 @@
 use egg::Language;
-use egg_sql_labs::{
+use sql_optimizer_labs::{
     agg::{plan_select, Error},
     EGraph, RecExpr,
 };

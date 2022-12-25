@@ -1,4 +1,4 @@
-use egg_sql_labs::plan::column_pruning_rules;
+use sql_optimizer_labs::plan::column_pruning_rules;
 
 egg::test_fn! {
     column_pruning,

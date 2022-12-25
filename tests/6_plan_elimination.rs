@@ -1,4 +1,4 @@
-use egg_sql_labs::plan::rules;
+use sql_optimizer_labs::plan::rules;
 
 egg::test_fn! {
     limit_0,

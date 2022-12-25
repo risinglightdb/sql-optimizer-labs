@@ -1,4 +1,4 @@
-use egg_sql_labs::{expr, plan, Rewrite};
+use sql_optimizer_labs::{expr, plan, Rewrite};
 
 fn rules() -> Vec<Rewrite> {
     let mut rules = vec![];
