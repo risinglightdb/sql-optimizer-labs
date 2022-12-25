@@ -1,6 +1,7 @@
 use egg::{define_language, Analysis, DidMerge, Id, Symbol};
 
 pub mod expr;
+pub mod plan;
 mod value;
 
 pub use value::*;
@@ -64,6 +65,11 @@ define_language! {
         "agg" = Agg([Id; 3]),                   // (agg aggs=[expr..] group_keys=[expr..] child)
                                                     // expressions must be agg
                                                     // output = aggs || group_keys
+
+        // internal functions
+        "empty" = Empty(Id),                    // (empty child)
+                                                    // returns empty chunk
+                                                    // with the same schema as `child`
     }
 }
 
