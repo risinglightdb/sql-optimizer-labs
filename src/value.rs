@@ -58,6 +58,10 @@ impl Value {
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
+
+    pub fn is_zero(&self) -> bool {
+        matches!(self, Value::Int(0))
+    }
 }
 
 macro_rules! impl_arith_for_value {

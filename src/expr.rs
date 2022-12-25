@@ -1,6 +1,6 @@
 //! Expression simplification rules and constant folding.
 
-use egg::rewrite as rw;
+use egg::{rewrite as rw, Subst, Var};
 
 use super::*;
 
@@ -28,6 +28,8 @@ pub fn rules() -> Vec<Rewrite> { vec![
 
     rw!("mul-add-distri";   "(* ?a (+ ?b ?c))" => "(+ (* ?a ?b) (* ?a ?c))"),
     rw!("mul-add-factor";   "(+ (* ?a ?b) (* ?a ?c))" => "(* ?a (+ ?b ?c))"),
+
+    rw!("mul-div-cancel"; "(/ (* ?a ?b) ?b)" => "?a" if is_not_zero("?b")),
 
     rw!("eq-eq";     "(=  ?a ?a)" => "true"),
     rw!("ne-eq";     "(<> ?a ?a)" => "false"),
@@ -104,7 +106,14 @@ pub fn eval_constant(egraph: &EGraph, enode: &Expr) -> ConstValue {
         Add([a, b]) => x(a)? + x(b)?,
         Sub([a, b]) => x(a)? - x(b)?,
         Mul([a, b]) => x(a)? * x(b)?,
-        Div([a, b]) => x(a)? / x(b)?,
+        Div([a, b]) => {
+            let xa = x(a)?;
+            let xb = x(b)?;
+            if xb.is_zero() {
+                return None;
+            }
+            xa / xb
+        }
         Eq([a, b]) => (x(a)? == x(b)?).into(),
         NotEq([a, b]) => (x(a)? != x(b)?).into(),
         Gt([a, b]) => (x(a)? > x(b)?).into(),
@@ -122,5 +131,21 @@ pub fn union_constant(egraph: &mut EGraph, id: Id) {
     if let Some(val) = &egraph[id].data.constant {
         let added = egraph.add(Expr::Constant(val.clone()));
         egraph.union(id, added);
+    }
+}
+
+/// Returns true if the expression is a non-zero constant.
+fn is_not_zero(var: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    value_is(var, |v| !v.is_zero())
+}
+
+fn value_is(v: &str, f: impl Fn(&Value) -> bool) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    let v = v.parse::<Var>().unwrap();
+    move |egraph, _, subst| {
+        if let Some(n) = &egraph[subst[v]].data.constant {
+            f(n)
+        } else {
+            false
+        }
     }
 }
