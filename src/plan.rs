@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use crate::schema::schema_is_eq;
+
 use super::*;
 use egg::{rewrite as rw, Applier, Language, Pattern, PatternAst, Subst, Symbol, Var};
 
@@ -23,6 +25,7 @@ fn cancel_rules() -> Vec<Rewrite> { vec![
     rw!("filter-true";      "(filter true ?child)"      => "?child"),
     rw!("filter-false";     "(filter false ?child)"     => "(empty ?child)"),
     rw!("inner-join-false"; "(join inner false ?l ?r)"  => "(empty (join inner false ?l ?r))"),
+    rw!("identical-proj";   "(proj ?exprs ?child)"      => "?child" if schema_is_eq("?exprs", "?child")),
 
     rw!("proj-on-empty";    "(proj ?exprs (empty ?c))"                  => "(empty ?exprs)"),
     rw!("filter-on-empty";  "(filter ?cond (empty ?c))"                 => "(empty ?c)"),

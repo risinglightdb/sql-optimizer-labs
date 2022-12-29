@@ -156,3 +156,25 @@ impl Not for Value {
 }
 
 pub type Column = egg::Symbol;
+
+/// The physical index to the column of the child plan.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
+pub struct ColumnIndex(pub u32);
+
+impl Display for ColumnIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#{}", self.0)
+    }
+}
+
+impl FromStr for ColumnIndex {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let body = s
+            .strip_prefix('#')
+            .ok_or_else(|| "no leading #".to_string())?;
+        let num = body.parse().map_err(|e| format!("invalid number: {e}"))?;
+        Ok(Self(num))
+    }
+}
