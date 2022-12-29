@@ -72,9 +72,10 @@ define_language! {
                                                     // output = aggs || group_keys
 
         // internal functions
-        "prune" = Prune([Id; 2]),               // (prune node child)
-                                                    // do column prune on `child`
-                                                    // with the used columns in `node`
+        "column-merge" = ColumnMerge([Id; 2]),  // (column-merge list1 list2)
+                                                    // return a list of columns from list1 and list2
+        "column-prune" = ColumnPrune([Id; 2]),  // (column-prune filter list)
+                                                    // remove element from `list` whose column set is not a subset of `filter`
         "empty" = Empty(Id),                    // (empty child)
                                                     // returns empty chunk
                                                     // with the same schema as `child`
@@ -89,6 +90,21 @@ impl Expr {
             Expr::List(l) => l,
             _ => panic!("expected list"),
         }
+    }
+}
+
+trait ExprExt {
+    fn as_list(&self) -> &[Id];
+}
+
+impl<D> ExprExt for egg::EClass<Expr, D> {
+    fn as_list(&self) -> &[Id] {
+        self.iter()
+            .find_map(|e| match e {
+                Expr::List(list) => Some(list),
+                _ => None,
+            })
+            .expect("not list")
     }
 }
 

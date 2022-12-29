@@ -30,10 +30,6 @@ pub fn analyze_schema(egraph: &EGraph, enode: &Expr) -> Schema {
         Proj([exprs, _]) => x(exprs)?,
         Agg([exprs, group_keys, _]) => concat(x(exprs)?, x(group_keys)?),
 
-        // prune node may changes the schema, but we don't know the exact result for now
-        // so just return `None` to indicate "unknown"
-        Prune(_) => return None,
-
         // not plan node
         _ => return None,
     })

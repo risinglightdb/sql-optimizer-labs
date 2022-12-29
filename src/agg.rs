@@ -11,12 +11,15 @@ pub type AggSet = Vec<Expr>;
 pub fn analyze_aggs(egraph: &EGraph, enode: &Expr) -> AggSet {
     use Expr::*;
     let x = |i: &Id| egraph[*i].data.aggs.clone();
-    if let Max(_) | Min(_) | Sum(_) | Avg(_) | Count(_) = enode {
-        return vec![enode.clone()];
+    match enode {
+        Max(_) | Min(_) | Sum(_) | Avg(_) | Count(_) => vec![enode.clone()],
+        // merge the set from all children
+        Nested(_) | List(_) | Neg(_) | Not(_) | IsNull(_) | Add(_) | Sub(_) | Mul(_) | Div(_)
+        | Eq(_) | NotEq(_) | Gt(_) | Lt(_) | GtEq(_) | LtEq(_) | And(_) | Or(_) | Xor(_)
+        | Asc(_) | Desc(_) => enode.children().iter().flat_map(x).collect(),
+        // ignore plan nodes
+        _ => vec![],
     }
-    // merge the set from all children
-    // TODO: ignore plan nodes
-    enode.children().iter().flat_map(x).collect()
 }
 
 #[derive(Debug, PartialEq, Eq)]
